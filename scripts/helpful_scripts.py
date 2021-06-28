@@ -19,4 +19,5 @@ def approve_erc20(amount, to, erc20_address, account):
     erc20 = interface.IERC20(erc20_address)
     tx_hash = erc20.approve(to, amount, {"from": account})
     print("Approved!")
+    tx_hash.wait(1)
     return tx_hash

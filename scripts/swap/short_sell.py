@@ -2,6 +2,7 @@ from brownie import accounts, config, interface, network
 from web3 import Web3
 from scripts.get_weth import get_weth
 from scripts.helpful_scripts import get_account, approve_erc20
+from chainlink_mapping import price_feed_mapping
 from scripts.swap.swap import swap
 from scripts.aave.aave_borrow import get_lending_pool, get_borrowable_data, borrow_erc20
 from scripts.chainlink.chainlink import get_asset_price
@@ -13,10 +14,13 @@ def main():
     account = get_account()
     weth_address = config["networks"][network.show_active()]["weth_token"]
     dai_address = config["networks"][network.show_active()]["aave_dai_token"]
+    sushiswapv2_router02 = config["networks"][network.show_active()][
+        "sushiswapv2_router02"
+    ]
     if network.show_active() in ["mainnet-fork"]:
         get_weth(account=account)
     print(
-        f"Starting ETH Balance is: {interface.IERC20(weth_address).balanceOf(account.address)}"
+        f"Starting WETH Balance is: {interface.IERC20(weth_address).balanceOf(account.address)}"
     )
     print(
         f"Starting DAI Balance is: {interface.IERC20(dai_address).balanceOf(account.address)}"
@@ -34,25 +38,26 @@ def main():
     borrow_erc20(lending_pool, amount_dai_to_borrow, account, erc20_address=dai_address)
     # Sell the borrowed asset
     # You could use anything like Aave, Uniswap, 1inch, etc
-    amount_dai_to_borrow = int(amount_dai_to_borrow * 10 ** 18)
-    price_feed = config["networks"][network.show_active()]["dai_eth_price_feed"]
-    uniswapv2_router02 = config["networks"][network.show_active()]["uniswapv2_router02"]
-    approve_tx = approve_erc20(
-        amount_dai_to_borrow, uniswapv2_router02, dai_address, account
-    )
-    approve_tx.wait(1)
+    amount_dai_to_borrow = int(amount_dai_to_borrow * (10 ** 18))
+    price_feed_address = price_feed_mapping[network.show_active()][
+        (dai_address, weth_address)
+    ]
+
+    tx = approve_erc20(amount_dai_to_borrow, sushiswapv2_router02, dai_address, account)
+    tx.wait(1)
+
     swap(
         dai_address,
         weth_address,
-        amount_dai_to_borrow,
+        amount_dai_to_borrow - Web3.toWei(1, "ether"),
         account,
-        price_feed,
-        uniswapv2_router02,
+        price_feed_address,
+        sushiswapv2_router02,
     )
     print(
-        f"Ending ETH Balance is: {interface.IERC20(weth_address).balanceOf(account.address)}"
+        f"Ending WETH Balance is: {interface.IERC20(weth_address).balanceOf(account.address)}"
     )
     print(
         f"Ending DAI Balance is: {interface.IERC20(dai_address).balanceOf(account.address)}"
     )
-    borrowable_eth, total_debt_eth = get_borrowable_data(lending_pool, account)
+    # borrowable_eth, total_debt_eth = get_borrowable_data(lending_pool, account)
