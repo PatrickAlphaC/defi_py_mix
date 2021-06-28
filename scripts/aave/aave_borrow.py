@@ -1,6 +1,8 @@
-from brownie import accounts, config, interface, network
+from brownie import config, interface, network
 from web3 import Web3
 from scripts.get_weth import get_weth
+from scripts.helpful_scripts import get_account, approve_erc20
+from scripts.chainlink.chainlink import get_asset_price
 
 amount = Web3.toWei(0.1, "ether")
 
@@ -27,15 +29,6 @@ def main():
     repay_all(amount_erc20_to_borrow, lending_pool, account)
 
 
-def get_account():
-    if network.show_active() in ["hardhat", "development", "mainnet-fork"]:
-        return accounts[0]
-    if network.show_active() in config["networks"]:
-        account = accounts.add(config["wallets"]["from_key"])
-        return account
-    return None
-
-
 def get_lending_pool():
     lending_pool_addresses_provider = interface.ILendingPoolAddressesProvider(
         config["networks"][network.show_active()]["lending_pool_addresses_provider"]
@@ -43,15 +36,6 @@ def get_lending_pool():
     lending_pool_address = lending_pool_addresses_provider.getLendingPool()
     lending_pool = interface.ILendingPool(lending_pool_address)
     return lending_pool
-
-
-def approve_erc20(amount, lending_pool_address, erc20_address, account):
-    print("Approving ERC20...")
-    erc20 = interface.IERC20(erc20_address)
-    tx_hash = erc20.approve(lending_pool_address, amount, {"from": account})
-    tx_hash.wait(1)
-    print("Approved!")
-    return True
 
 
 def get_borrowable_data(lending_pool, account):
@@ -90,17 +74,7 @@ def borrow_erc20(lending_pool, amount, account, erc20_address=None):
     )
     transaction.wait(1)
     print(f"Congratulations! We have just borrowed {amount}")
-
-
-def get_asset_price():
-    # For mainnet we can just do:
-    # return Contract(f"{pair}.data.eth").latestAnswer() / 1e8
-    dai_eth_price_feed = interface.AggregatorV3Interface(
-        config["networks"][network.show_active()]["dai_eth_price_feed"]
-    )
-    latest_price = Web3.fromWei(dai_eth_price_feed.latestRoundData()[1], "ether")
-    print(f"The DAI/ETH price is {latest_price}")
-    return float(latest_price)
+    return transaction
 
 
 def repay_all(amount, lending_pool, account):

@@ -1,9 +1,9 @@
-from scripts.aave_borrow import (
-    get_asset_price,
+from scripts.aave.aave_borrow import (
     get_lending_pool,
     approve_erc20,
-    get_account,
 )
+from scripts.chainlink.chainlink import get_asset_price
+from scripts.helpful_scripts import get_account
 from brownie import config, network
 
 
